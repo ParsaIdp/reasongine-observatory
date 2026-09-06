@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reasongine observatory</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e2230; --border: #2a2f3d;
+    --fg: #e6e8ee; --muted: #8b92a5; --accent: #7aa2f7; --good: #6fd08c;
+    --warn: #e0af68; --bad: #f7768e; --think: #bb9af7; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  a { color: var(--accent); text-decoration: none; cursor: pointer; }
+  code, pre, .mono { font-family: var(--mono); font-size: 12px; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  #app { display: grid; grid-template-columns: 340px 1fr; height: 100vh; }
+  #sidebar { border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; min-width: 0; }
+  #sidebar header { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  #sidebar header h1 { margin: 0 0 8px; font-size: 15px; letter-spacing: .02em; }
+  #sidebar input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); }
+  #runs { overflow-y: auto; flex: 1; }
+  .run { padding: 9px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .run:hover { background: var(--panel2); }
+  .run.active { background: var(--panel2); border-left: 3px solid var(--accent); padding-left: 11px; }
+  .run .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .run .meta { color: var(--muted); font-size: 11.5px; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+  #main { overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+  #head { padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  #head h2 { margin: 0 0 6px; font-size: 15px; word-break: break-all; }
+  #tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  #tabs button { background: transparent; color: var(--muted); border: 1px solid transparent; padding: 5px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+  #tabs button.active { color: var(--fg); background: var(--panel2); border-color: var(--border); }
+  #content { overflow-y: auto; padding: 18px 20px 60px; flex: 1; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .kv { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .kv .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .kv .v { font-size: 14px; margin-top: 2px; word-break: break-all; }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 22px 0 8px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .card h4 { margin: 0 0 6px; font-size: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: var(--mono); font-size: 11px; }
+  .badge { display: inline-block; border-radius: 4px; padding: 1px 7px; font-size: 11.5px; font-family: var(--mono); margin-right: 4px; background: var(--panel2); border: 1px solid var(--border); }
+  .badge.good { color: var(--good); } .badge.bad { color: var(--bad); } .badge.warn { color: var(--warn); }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-family: var(--mono); }
+  details { margin: 4px 0; }
+  summary { cursor: pointer; color: var(--muted); }
+  summary:hover { color: var(--fg); }
+  .pre-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; max-height: 480px; overflow: auto; margin-top: 6px; }
+  .step { border-left: 3px solid var(--border); margin: 0 0 8px; padding: 6px 10px; background: var(--panel); border-radius: 0 6px 6px 0; }
+  .step.thinking { border-left-color: var(--think); }
+  .step.text { border-left-color: var(--good); }
+  .step.tool_use { border-left-color: var(--accent); }
+  .step.tool_use.err { border-left-color: var(--bad); }
+  .step.result { border-left-color: var(--warn); }
+  .step .hdr { display: flex; gap: 10px; align-items: baseline; color: var(--muted); font-size: 11.5px; }
+  .step .hdr b { color: var(--fg); font-size: 12.5px; }
+  .step .body { margin-top: 4px; }
+  .thinking .body { color: #c9c3e6; font-style: italic; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar select, .toolbar input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font: inherit; }
+  .toolbar label { color: var(--muted); }
+  .files { display: grid; grid-template-columns: 300px 1fr; gap: 14px; }
+  .files ul { list-style: none; margin: 0; padding: 0; }
+  .files li { padding: 2px 0; font-family: var(--mono); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .files li a.sel { color: var(--fg); font-weight: 600; }
+  .files li .sz { color: var(--muted); }
+  .files .group { margin-top: 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .err { color: var(--bad); }
+  .muted { color: var(--muted); }
+  .bar { display: inline-block; height: 8px; background: var(--accent); border-radius: 2px; vertical-align: middle; }
+  @media (max-width: 900px) { #app { grid-template-columns: 1fr; } #sidebar { max-height: 40vh; } .files { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <header>
+      <h1>reasongine observatory</h1>
+      <input id="filter" placeholder="filter runs…" autocomplete="off">
+    </header>
+    <div id="runs"><div class="empty">loading…</div></div>
+  </aside>
+  <section id="main">
+    <div id="head"><h2 id="run-title">Select a run</h2><div id="tabs"></div></div>
+    <div id="content"><div class="empty">Pick a run on the left to inspect its trajectory, hypotheses, predictions and scores.</div></div>
+  </section>
+</div>
+
+<script src="snapshot.js"></script>
+<script>
+'use strict';
+const $ = (sel, el = document) => el.querySelector(sel);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtNum = (v, d = 3) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '—';
+const fmtPct = v => (typeof v === 'number') ? (v * 100).toFixed(1) + '%' : '—';
+const fmtUsd = v => (typeof v === 'number') ? '$' + v.toFixed(3) : '—';
+const fmtDur = s => { if (s == null) return '—'; s = Math.round(s); return s < 60 ? s + 's' : s < 3600 ? Math.floor(s/60) + 'm ' + (s%60) + 's' : Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm'; };
+const fmtTs = t => t ? new Date(t).toLocaleString() : '—';
+const json = o => `<pre>${esc(JSON.stringify(o, null, 2))}</pre>`;
+const preBox = (text, cls = '') => `<div class="pre-box ${cls}"><pre>${esc(text)}</pre></div>`;
+const snapshot = window.OBSERVATORY_SNAPSHOT;
+const api = async (path) => {
+  if (snapshot) {
+    if (path === '/api/runs') return snapshot.runs;
+    const name = path.replace(/^\/api\/runs\//, '');
+    if (snapshot.details[name]) return snapshot.details[name];
+    throw new Error('Not included in this results snapshot');
+  }
+  const r = await fetch(path); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j;
+};
+
+const TABS = snapshot ? ['overview', 'hypotheses', 'scores'] : ['overview', 'hypotheses', 'scores', 'trajectory', 'predictions', 'llm calls', 'files'];
+const state = { runs: [], run: null, detail: null, tab: 'overview', cache: {} };
+
+// ------------------------------------------------------------------ sidebar
+async function loadRuns() {
+  state.runs = await api('/api/runs');
+  renderRuns();
+}
+function renderRuns() {
+  const q = $('#filter').value.trim().toLowerCase();
+  const rows = state.runs.filter(r => !q || r.name.toLowerCase().includes(q) || (r.execution || '').includes(q));
+  $('#runs').innerHTML = rows.length ? rows.map(r => `
+    <div class="run ${r.name === state.run ? 'active' : ''}" data-run="${esc(r.name)}">
+      <div class="title" title="${esc(r.name)}">${esc(r.name.split('/').pop())}</div>
+      <div class="meta">
+        <span>${esc(r.execution)}</span>
+        <span>${r.n_hypotheses} hyp · ${r.n_scored} scored${r.n_errors ? ` · <span class="err">${r.n_errors} err</span>` : ''}</span>
+        ${r.best_cosine != null ? `<span>best cos ${fmtNum(r.best_cosine)}</span>` : ''}
+        <span>${fmtUsd(r.cost_usd)}</span>
+        <span>${fmtTs(r.started_at)}</span>
+        ${r.in_progress ? '<span class="warn">running</span>' : ''}
+      </div>
+    </div>`).join('') : '<div class="empty">no runs</div>';
+  $('#runs').querySelectorAll('.run').forEach(el => el.onclick = () => location.hash = `#${el.dataset.run}/${state.tab}`);
+}
+$('#filter').oninput = renderRuns;
+
+// --------------------------------------------------------------------- run
+async function openRun(name, tab) {
+  if (state.run !== name) {
+    state.run = name; state.detail = null; state.cache = {};
+    $('#run-title').textContent = name;
+    $('#content').innerHTML = '<div class="empty">loading…</div>';
+    renderRuns();
+    try { state.detail = await api(`/api/runs/${name}`); }
+    catch (e) { $('#content').innerHTML = `<div class="empty err">${esc(e.message)}</div>`; return; }
+  }
+  state.tab = TABS.includes(tab) ? tab : 'overview';
+  renderTabs(); renderTab();
+}
+function renderTabs() {
+  const d = state.detail;
+  const n = { hypotheses: d.hypotheses.length, scores: d.scores.length, predictions: d.prediction_summaries.length, 'llm calls': d.requests.length, trajectory: Object.keys(d.workspaces).length };
+  $('#tabs').innerHTML = TABS.map(t => `<button class="${t === state.tab ? 'active' : ''}" data-tab="${t}">${t}${n[t] ? ` <span class="muted">${n[t]}</span>` : ''}</button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => location.hash = `#${state.run}/${b.dataset.tab}`);
+}
+function renderTab() {
+  const c = $('#content');
+  const render = { overview: renderOverview, hypotheses: renderHypotheses, scores: renderScores, trajectory: renderTrajectory, predictions: renderPredictions, 'llm calls': renderCalls, files: renderFiles }[state.tab];
+  c.innerHTML = ''; c.scrollTop = 0;
+  render(c, state.detail);
+}
+
+// ---------------------------------------------------------------- overview
+function kv(k, v) { return `<div class="kv"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`; }
+function renderOverview(c, d) {
+  const s = d.summary, m = d.manifest || {}, counts = s.counts || {};
+  let html = `<div class="grid">
+    ${kv('experiment', esc(s.experiment_id))}${kv('execution', esc(s.execution))}
+    ${kv('model', esc(s.model_id || '—') + (s.effort ? ` <span class="muted">/ ${esc(s.effort)}</span>` : ''))}
+    ${kv('cost', fmtUsd(s.cost_usd))}${kv('duration', fmtDur(s.duration_s))}
+    ${kv('started', fmtTs(s.started_at))}${kv('completed', fmtTs(s.completed_at))}
+    ${kv('git commit', `<code>${esc((m.git_commit || '—').slice(0, 12))}</code>`)}
+    ${kv('best cosine', fmtNum(s.best_cosine))}
+  </div>`;
+  if (m.evaluation_note) html += `<p class="warn">${esc(m.evaluation_note)}</p>`;
+  if (Object.keys(counts).length) {
+    html += `<h3>candidate counts</h3><div class="grid">${Object.entries(counts).map(([k, v]) => kv(k.replace(/_/g, ' '), v)).join('')}</div>`;
+  }
+  if (m.prompt_versions) html += `<h3>prompts</h3><div class="card">${Object.entries(m.prompt_versions).filter(([k]) => !k.endsWith('sha256')).map(([k, v]) => `<div><span class="muted">${esc(k)}</span> <code>${esc(v)}</code></div>`).join('')}</div>`;
+  if (m.agent_harness) html += `<h3>agent harness</h3><div class="grid">${Object.entries(m.agent_harness).map(([k, v]) => kv(k.replace(/_/g, ' '), esc(v))).join('')}</div>`;
+  if (m.isolation) html += `<h3>isolation</h3><div class="chips">${Object.entries(m.isolation).map(([k, v]) => `<span class="chip ${v ? 'good' : 'bad'}">${esc(k)}: ${v}</span>`).join('')}</div>`;
+  html += `<h3>errors (${d.errors.length})</h3>` + (d.errors.length ? d.errors.map(e => `<div class="card"><span class="badge bad">${esc(e.error_type)}</span> <code>${esc(e.hypothesis_id || '')}</code> <span class="muted">${fmtTs(e.timestamp)}</span><div style="margin-top:4px">${esc(e.message)}</div></div>`).join('') : '<div class="muted">none</div>');
+  if (d.source_runs) html += `<h3>source runs (merged)</h3><table><tr><th>hypothesis</th><th>label</th><th>source run</th></tr>${d.source_runs.map(r => `<tr><td><code>${esc(r.hypothesis_id)}</code></td><td>${esc(r.label)}</td><td><a onclick="location.hash='#hypothesis_mvp/${esc(r.source_run.split('/').pop())}/overview'"><code>${esc(r.source_run.split('/').pop())}</code></a></td></tr>`).join('')}</table>`;
+  if (d.cost_summary) html += `<h3>cost summary</h3><details><summary>cost_summary.json</summary>${json(d.cost_summary)}</details>`;
+  if (d.config_yaml) html += `<h3>config snapshot</h3>${preBox(d.config_yaml)}`;
+  html += `<h3>manifest</h3><details><summary>manifest.json</summary>${json(m)}</details>`;
+  c.innerHTML = html;
+}
+
+// -------------------------------------------------------------- hypotheses
+function scoreBadges(sc) {
+  if (!sc) return '<span class="badge warn">unscored</span>';
+  return `<span class="badge good" title="cosine similarity">cos ${fmtNum(sc.cosine_similarity)}</span>
+    <span class="badge" title="centered cosine">ccos ${fmtNum(sc.centered_cosine_similarity)}</span>
+    <span class="badge" title="direction accuracy">dir ${fmtPct(sc.direction_accuracy)}</span>
+    <span class="badge" title="balanced direction accuracy">bdir ${fmtPct(sc.balanced_direction_accuracy)}</span>
+    <span class="badge" title="mean absolute error">mae ${fmtNum(sc.mean_absolute_error)}</span>`;
+}
+function list(items) { return items && items.length ? `<ol style="margin:4px 0 0 18px;padding:0">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ol>` : '<span class="muted">none</span>'; }
+function renderHypotheses(c, d) {
+  if (!d.hypotheses.length) { c.innerHTML = '<div class="empty">no valid hypotheses in this run</div>'; return; }
+  const scores = Object.fromEntries(d.scores.map(s => [s.hypothesis_id, s]));
+  const ranks = Object.fromEntries((d.ranked || []).map(r => [r.hypothesis_id, r.rank]));
+  const labels = Object.fromEntries((d.source_runs || []).map(r => [r.hypothesis_id, r.label]));
+  const candidates = Object.keys(d.workspaces);
+  c.innerHTML = d.hypotheses.map(h => {
+    const idx = (h.hypothesis_id.match(/(\d+)$/) || [])[1];
+    const cand = idx && candidates.find(k => k.endsWith(idx.padStart(3, '0')));
+    return `<div class="card">
+      <h4>${ranks[h.hypothesis_id] ? `<span class="badge">#${ranks[h.hypothesis_id]}</span>` : ''} ${esc(h.title)}</h4>
+      <div style="margin-bottom:6px"><code>${esc(h.hypothesis_id)}</code> ${labels[h.hypothesis_id] ? `<span class="chip">${esc(labels[h.hypothesis_id])}</span>` : ''} ${scoreBadges(scores[h.hypothesis_id])}
+        ${cand ? ` <a onclick="location.hash='#${state.run}/trajectory'; state.traj={candidate:'${cand}',role:'generator'}">generator trajectory ↗</a> · <a onclick="location.hash='#${state.run}/trajectory'; state.traj={candidate:'${cand}',role:'predictor'}">predictor trajectory ↗</a>` : ''}
+        ${d.prediction_summaries.some(p => p.hypothesis_id === h.hypothesis_id) ? ` · <a onclick="state.predSel='${esc(h.hypothesis_id)}'; location.hash='#${state.run}/predictions'">predictions ↗</a>` : ''}
+      </div>
+      <div><b>Claim.</b> ${esc(h.claim)}</div>
+      <details open><summary>mechanism steps (${(h.mechanism_steps || []).length})</summary>${list(h.mechanism_steps)}</details>
+      <details><summary>supporting observations (${(h.supporting_observation_ids || []).length})</summary><div class="chips" style="margin-top:4px">${(h.supporting_observation_ids || []).map(i => `<span class="chip">${esc(i)}</span>`).join('')}</div></details>
+      <details><summary>assumptions (${(h.assumptions || []).length})</summary>${list(h.assumptions)}</details>
+      <details><summary>falsifiable predictions (${(h.falsifiable_predictions || []).length})</summary>${list(h.falsifiable_predictions)}</details>
+    </div>`;
+  }).join('');
+}
+
+// ------------------------------------------------------------------ scores
+function sortable(table, rows, cols, sortKey, desc) {
+  const render = () => {
+    const sorted = [...rows].sort((a, b) => {
+      const x = a[sortKey], y = b[sortKey];
+      const r = (typeof x === 'number' && typeof y === 'number') ? x - y : String(x ?? '').localeCompare(String(y ?? ''));
+      return desc ? -r : r;
+    });
+    table.innerHTML = `<thead><tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}" data-k="${c.key}">${c.label}${c.key === sortKey ? (desc ? ' ▼' : ' ▲') : ''}</th>`).join('')}</tr></thead>
+      <tbody>${sorted.map(r => `<tr>${cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    table.querySelectorAll('th').forEach(th => th.onclick = () => { if (sortKey === th.dataset.k) desc = !desc; else { sortKey = th.dataset.k; desc = true; } render(); });
+  };
+  render();
+}
+function renderScores(c, d) {
+  if (!d.scores.length) { c.innerHTML = '<div class="empty">no scores in this run</div>'; return; }
+  const titles = Object.fromEntries(d.hypotheses.map(h => [h.hypothesis_id, h.title]));
+  const labels = Object.fromEntries((d.source_runs || []).map(r => [r.hypothesis_id, r.label]));
+  const costs = Object.fromEntries((d.ranked || []).map(r => [r.hypothesis_id, r.cost_usd]));
+  const rows = d.scores.map(s => ({ ...s, cost_usd: costs[s.hypothesis_id], title: titles[s.hypothesis_id] || '', label: labels[s.hypothesis_id] || '' }));
+  const baseline = d.baselines && Object.values(d.baselines)[0];
+  c.innerHTML = `<table id="score-table"></table>
+    ${baseline ? `<h3>baseline: ${esc(baseline.hypothesis_id)}</h3><div>${scoreBadges(baseline)}</div>` : ''}
+    <h3>per-modality breakdown</h3><div id="modality"></div>
+    ${d.leaderboard_md ? `<h3>leaderboard.md</h3>${preBox(d.leaderboard_md)}` : ''}`;
+  const cols = [
+    { key: 'hypothesis_id', label: 'id', fmt: v => `<code>${esc(v)}</code>` },
+    ...(d.source_runs ? [{ key: 'label', label: 'label' }] : []),
+    { key: 'cosine_similarity', label: 'cosine', num: true, fmt: v => `${fmtNum(v)} <span class="bar" style="width:${Math.max(0, v) * 60}px"></span>` },
+    { key: 'centered_cosine_similarity', label: 'centered', num: true, fmt: v => fmtNum(v) },
+    { key: 'direction_accuracy', label: 'direction', num: true, fmt: fmtPct },
+    { key: 'balanced_direction_accuracy', label: 'balanced dir', num: true, fmt: fmtPct },
+    { key: 'mean_absolute_error', label: 'MAE', num: true, fmt: v => fmtNum(v) },
+    ...(Object.values(costs).some(v => typeof v === 'number') ? [{ key: 'cost_usd', label: 'cost', num: true, fmt: fmtUsd }] : []),
+    { key: 'title', label: 'title' },
+  ];
+  sortable($('#score-table'), rows, cols, 'cosine_similarity', true);
+  $('#modality').innerHTML = d.scores.map(s => `<details><summary><code>${esc(s.hypothesis_id)}</code> by modality</summary>
+    <table><tr><th>modality</th><th class="num">n</th><th class="num">cosine</th><th class="num">centered</th><th class="num">direction</th><th class="num">MAE</th></tr>
+    ${Object.entries(s.by_modality || {}).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="num">${v.n_features}</td><td class="num">${fmtNum(v.cosine_similarity)}</td><td class="num">${fmtNum(v.centered_cosine_similarity)}</td><td class="num">${fmtPct(v.direction_accuracy)}</td><td class="num">${fmtNum(v.mean_absolute_error)}</td></tr>`).join('')}</table></details>`).join('');
+}
+
+// -------------------------------------------------------------- trajectory
+function renderTrajectory(c, d) {
+  const candidates = Object.keys(d.workspaces);
+  if (!candidates.length) {
+    c.innerHTML = `<div class="empty">This run has no agent workspaces (execution: ${esc(d.summary.execution)}).<br>For direct-API runs the prompt/response pairs are under the <a onclick="location.hash='#${state.run}/llm calls'">llm calls</a> tab.</div>`;
+    return;
+  }
+  const sel = state.traj && candidates.includes(state.traj.candidate) ? state.traj : { candidate: candidates[0], role: 'generator' };
+  state.traj = sel;
+  const roles = Object.keys(d.workspaces[sel.candidate]);
+  if (!roles.includes(sel.role)) sel.role = roles[0];
+  c.innerHTML = `<div class="toolbar">
+      <label>candidate</label><select id="t-cand">${candidates.map(k => `<option ${k === sel.candidate ? 'selected' : ''}>${k}</option>`).join('')}</select>
+      <label>role</label><select id="t-role">${roles.map(k => `<option ${k === sel.role ? 'selected' : ''}>${k}</option>`).join('')}</select>
+      <label><input type="checkbox" id="t-think" ${state.showThink === false ? '' : 'checked'}> thinking</label>
+      <label><input type="checkbox" id="t-out" ${state.showOut === false ? '' : 'checked'}> tool output</label>
+      <input id="t-find" placeholder="find in steps…" style="min-width:200px">
+    </div><div id="t-summary"></div><div id="t-steps"><div class="empty">loading transcript…</div></div>`;
+  $('#t-cand').onchange = e => { state.traj = { candidate: e.target.value, role: sel.role }; renderTab(); };
+  $('#t-role').onchange = e => { state.traj = { candidate: sel.candidate, role: e.target.value }; renderTab(); };
+  $('#t-think').onchange = e => { state.showThink = e.target.checked; drawSteps(); };
+  $('#t-out').onchange = e => { state.showOut = e.target.checked; drawSteps(); };
+  $('#t-find').oninput = () => drawSteps();
+  const key = `${sel.candidate}/${sel.role}`;
+  let traj = null;
+  const drawSteps = () => {
+    if (!traj) return;
+    const q = $('#t-find').value.trim().toLowerCase();
+    const showThink = state.showThink !== false, showOut = state.showOut !== false;
+    let n = 0;
+    $('#t-steps').innerHTML = traj.steps.map((s, i) => {
+      if (s.kind === 'thinking' && !showThink) return '';
+      const hay = JSON.stringify(s).toLowerCase();
+      if (q && !hay.includes(q)) return '';
+      n++;
+      return stepHtml(s, i, showOut);
+    }).join('') + (n ? '' : '<div class="empty">no matching steps</div>');
+  };
+  (state.cache[key] ? Promise.resolve(state.cache[key]) : api(`/api/runs/${state.run}/trajectory?candidate=${sel.candidate}&role=${sel.role}`))
+    .then(t => {
+      state.cache[key] = traj = t;
+      const r = t.result || {}, u = r.usage || {};
+      $('#t-summary').innerHTML = `<div class="grid">
+        ${kv('steps', t.n_steps)}${kv('turns', r.num_turns ?? '—')}${kv('cost', fmtUsd(r.total_cost_usd))}
+        ${kv('duration', fmtDur((r.duration_ms || 0) / 1000))}${kv('output tokens', u.output_tokens ?? '—')}
+        ${kv('thinking tokens', (u.output_tokens_details || {}).thinking_tokens ?? '—')}
+        ${kv('cache read', u.cache_read_input_tokens ?? '—')}${kv('status', r.subtype ? `<span class="${r.is_error ? 'err' : ''}">${esc(r.subtype)}</span>` : '<span class="warn">no result event</span>')}
+      </div><div class="chips" style="margin-bottom:12px">${Object.entries(t.tool_counts).map(([k, v]) => `<span class="chip">${esc(k)} × ${v}</span>`).join('')}
+        <a class="chip" href="/api/runs/${state.run}/file?path=agent_workspaces/${sel.candidate}/${sel.role}/transcript.jsonl" target="_blank">raw transcript.jsonl</a></div>`;
+      drawSteps();
+    })
+    .catch(e => $('#t-steps').innerHTML = `<div class="empty err">${esc(e.message)}</div>`);
+}
+function toolInputHtml(name, input) {
+  if (!input) return '';
+  if (name === 'Bash' && input.command) return preBox(input.command);
+  if ((name === 'Read' || name === 'Edit' || name === 'Write') && input.file_path) {
+    let s = `<code>${esc(input.file_path)}</code>`;
+    if (input.old_string != null) s += `<details><summary>diff</summary>${preBox('- ' + input.old_string.split('\n').join('\n- '))}${preBox('+ ' + (input.new_string || '').split('\n').join('\n+ '))}</details>`;
+    if (input.content != null) s += preBox(input.content);
+    return s;
+  }
+  if (name === 'Agent' || name === 'Task') return `<div><b>${esc(input.description || '')}</b> <span class="muted">${esc(input.subagent_type || '')}</span></div>${preBox(input.prompt || '')}`;
+  return json(input);
+}
+function stepHtml(s, i, showOut) {
+  const t = s.ts ? new Date(s.ts).toLocaleTimeString() : '';
+  const parent = s.parent ? `<span class="chip" title="${esc(s.parent)}">subagent</span>` : '';
+  if (s.kind === 'init') return `<div class="step"><div class="hdr"><b>session start</b><span>${t}</span></div><div class="body muted">model ${esc(s.model)} · tools: ${(s.tools || []).join(', ')} · cwd ${esc(s.cwd)}</div></div>`;
+  if (s.kind === 'thinking') return `<div class="step thinking"><div class="hdr"><b>thinking</b><span>${t}</span>${parent}<span>${s.text.length} chars</span></div><details><summary>${esc(s.text.slice(0, 160).replace(/\s+/g, ' '))}…</summary><div class="body"><pre>${esc(s.text)}</pre></div></details></div>`;
+  if (s.kind === 'text') return `<div class="step text"><div class="hdr"><b>assistant</b><span>${t}</span>${parent}</div><div class="body"><pre>${esc(s.text)}</pre></div></div>`;
+  if (s.kind === 'user') return `<div class="step"><div class="hdr"><b>user</b><span>${t}</span></div><div class="body"><pre>${esc(s.text)}</pre></div></div>`;
+  if (s.kind === 'tool_use') {
+    const out = s.output ?? '';
+    const long = out.length > 1500;
+    return `<div class="step tool_use ${s.is_error ? 'err' : ''}"><div class="hdr"><b>${esc(s.name)}</b><span>${t}</span>${parent}${s.duration_ms != null ? `<span>${fmtDur(s.duration_ms / 1000)}</span>` : ''}${s.is_error ? '<span class="err">error</span>' : ''}${s.output == null ? '<span class="warn">no result</span>' : ''}</div>
+      <div class="body">${toolInputHtml(s.name, s.input)}
+      ${showOut && s.output != null ? (long ? `<details><summary>output (${out.length} chars)</summary>${preBox(out)}</details>` : preBox(out)) : ''}</div></div>`;
+  }
+  if (s.kind === 'result') return `<div class="step result"><div class="hdr"><b>result · ${esc(s.subtype)}</b><span>${t}</span><span>${s.num_turns} turns</span><span>${fmtUsd(s.total_cost_usd)}</span></div><div class="body"><pre>${esc(s.text || '')}</pre>${s.errors && s.errors.length ? `<div class="err">${esc(JSON.stringify(s.errors))}</div>` : ''}</div></div>`;
+  return `<div class="step"><div class="hdr"><b>${esc(s.kind)}</b><span>${t}</span></div><div class="body">${json(s.raw || s)}</div></div>`;
+}
+
+// ------------------------------------------------------------- predictions
+function renderPredictions(c, d) {
+  const ps = d.prediction_summaries;
+  if (!ps.length) { c.innerHTML = '<div class="empty">no predictions in this run</div>'; return; }
+  const sel = ps.some(p => p.hypothesis_id === state.predSel) ? state.predSel : ps[0].hypothesis_id;
+  state.predSel = sel;
+  const p = ps.find(x => x.hypothesis_id === sel);
+  c.innerHTML = `<div class="toolbar"><label>hypothesis</label><select id="p-sel">${ps.map(x => `<option ${x.hypothesis_id === sel ? 'selected' : ''}>${x.hypothesis_id}</option>`).join('')}</select>
+      <input id="p-find" placeholder="filter feature id…" style="min-width:200px"><span class="muted" id="p-count"></span></div>
+    <div class="grid">${kv('features', p.n_features)}${kv('mean', fmtNum(p.mean))}${kv('min', fmtNum(p.min))}${kv('max', fmtNum(p.max))}${kv('fraction > 0', fmtPct(p.frac_positive))}${kv('distinct values', p.n_distinct)}</div>
+    <h3>vector rationale</h3><div class="card"><pre>${esc(p.vector_rationale || '')}</pre></div>
+    <h3>histogram</h3><div id="p-hist" class="card"></div>
+    <h3>features</h3><table id="p-table"></table>`;
+  $('#p-sel').onchange = e => { state.predSel = e.target.value; renderTab(); };
+  const key = `pred/${sel}`;
+  (state.cache[key] ? Promise.resolve(state.cache[key]) : api(`/api/runs/${state.run}/predictions/${sel}`)).then(full => {
+    state.cache[key] = full;
+    const rows = full.predictions.map(x => ({ ...x, modality: x.feature_id.split(':')[0] }));
+    const vals = rows.map(r => r.predicted_effect), lo = Math.min(...vals), hi = Math.max(...vals);
+    const bins = new Array(30).fill(0);
+    vals.forEach(v => bins[Math.min(29, Math.floor((v - lo) / ((hi - lo) || 1) * 30))]++);
+    const mx = Math.max(...bins);
+    $('#p-hist').innerHTML = `<div style="display:flex;align-items:flex-end;gap:2px;height:80px">${bins.map((b, i) => `<div title="${(lo + (hi - lo) * i / 30).toFixed(2)}–${(lo + (hi - lo) * (i + 1) / 30).toFixed(2)}: ${b}" style="flex:1;background:var(--accent);height:${b / mx * 100}%"></div>`).join('')}</div><div class="muted mono" style="display:flex;justify-content:space-between"><span>${lo.toFixed(2)}</span><span>${hi.toFixed(2)}</span></div>`;
+    const draw = () => {
+      const q = $('#p-find').value.trim().toLowerCase();
+      const shown = q ? rows.filter(r => r.feature_id.toLowerCase().includes(q)) : rows;
+      $('#p-count').textContent = `${shown.length} / ${rows.length}`;
+      sortable($('#p-table'), shown, [
+        { key: 'feature_id', label: 'feature', fmt: v => `<code>${esc(v)}</code>` },
+        { key: 'modality', label: 'modality' },
+        { key: 'predicted_effect', label: 'predicted effect', num: true, fmt: v => `${fmtNum(v, 4)} <span class="bar" style="width:${Math.min(80, Math.abs(v) * 20)}px;background:${v < 0 ? 'var(--bad)' : 'var(--good)'}"></span>` },
+      ], 'predicted_effect', true);
+    };
+    $('#p-find').oninput = draw; draw();
+  }).catch(e => $('#p-table').innerHTML = `<tr><td class="err">${esc(e.message)}</td></tr>`);
+}
+
+// --------------------------------------------------------------- llm calls
+function renderCalls(c, d) {
+  if (!d.requests.length && !d.api_usage.length) { c.innerHTML = '<div class="empty">no llm calls recorded</div>'; return; }
+  const byName = {};
+  const keyOf = r => r.request_id || r.call_name;
+  d.requests.forEach(r => { (byName[keyOf(r)] ||= {}).request = r; });
+  d.responses.forEach(r => { (byName[keyOf(r)] ||= {}).response = r; });
+  d.api_usage.forEach(r => { (byName[keyOf(r)] ||= {}).usage = r; });
+  c.innerHTML = Object.entries(byName).map(([k, v]) => {
+    const req = v.request || {}, res = v.response || {}, use = v.usage || {};
+    const cost = (use.reported_cost || use.estimated_cost || {}).amount;
+    const usage = use.usage || {};
+    const promptText = req.prompt ?? (req.request_body ? JSON.stringify(req.request_body, null, 2) : null);
+    const resText = res.text ?? (res.result ? (typeof res.result === 'string' ? res.result : res.result.result || JSON.stringify(res.result, null, 2)) : null);
+    return `<div class="card"><h4>${esc(req.call_name || res.call_name || use.call_name || k)} <span class="muted mono">${esc(k)}</span></h4>
+      <div>${req.model ? `<span class="badge">${esc(req.model)}</span>` : ''}${req.effort ? `<span class="badge">${esc(req.effort)}</span>` : ''}${req.harness ? `<span class="badge">${esc(req.harness)}</span>` : ''}
+        ${cost != null ? `<span class="badge good">${fmtUsd(cost)}</span>` : ''}
+        ${usage.output_tokens != null ? `<span class="badge">out ${usage.output_tokens}</span>` : ''}${usage.cache_read_input_tokens != null ? `<span class="badge">cache read ${usage.cache_read_input_tokens}</span>` : ''}${usage.cache_creation_input_tokens != null ? `<span class="badge">cache write ${usage.cache_creation_input_tokens}</span>` : ''}
+        ${res.exit_code != null ? `<span class="badge ${res.exit_code ? 'bad' : ''}">exit ${res.exit_code}</span>` : ''}
+        <span class="muted">${fmtTs(req.timestamp || use.timestamp)}</span></div>
+      ${promptText != null ? `<details><summary>prompt / request (${promptText.length} chars)</summary>${preBox(promptText)}</details>` : ''}
+      ${resText != null ? `<details open><summary>response</summary>${preBox(resText)}</details>` : '<div class="muted">no response recorded</div>'}
+      ${res.result && typeof res.result === 'object' ? `<details><summary>result metadata</summary>${json({ ...res.result, result: undefined })}</details>` : ''}
+      ${use.subagent_stats ? `<details><summary>subagent stats</summary>${json(use.subagent_stats)}</details>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ------------------------------------------------------------------- files
+function renderFiles(c, d) {
+  const groups = [{ name: 'run root', files: d.root_files.map(f => ({ path: f.path, name: f.path, size: f.size })) }];
+  for (const [cand, roles] of Object.entries(d.workspaces)) for (const [role, files] of Object.entries(roles)) groups.push({ name: `${cand} / ${role}`, files });
+  c.innerHTML = `<div class="files"><div>${groups.map(g => `<div class="group">${esc(g.name)}</div><ul>${g.files.map(f => `<li><a data-path="${esc(f.path)}">${esc(f.name)}</a> <span class="sz">${(f.size / 1024).toFixed(1)}k</span></li>`).join('')}</ul>`).join('')}</div>
+    <div><div id="f-title" class="muted">select a file</div><div id="f-body" class="pre-box" style="max-height:80vh"></div></div></div>`;
+  c.querySelectorAll('a[data-path]').forEach(a => a.onclick = async () => {
+    c.querySelectorAll('a.sel').forEach(x => x.classList.remove('sel')); a.classList.add('sel');
+    const p = a.dataset.path;
+    $('#f-title').innerHTML = `<code>${esc(p)}</code> · <a href="/api/runs/${state.run}/file?path=${encodeURIComponent(p)}" target="_blank">open raw</a>`;
+    $('#f-body').innerHTML = '<span class="muted">loading…</span>';
+    const r = await fetch(`/api/runs/${state.run}/file?path=${encodeURIComponent(p)}`);
+    let text = await r.text();
+    if (p.endsWith('.json')) { try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {} }
+    $('#f-body').innerHTML = `<pre>${esc(text)}</pre>`;
+  });
+}
+
+// ----------------------------------------------------------------- routing
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (!h) return;
+  const parts = h.split('/');
+  if (parts.length < 2) return;
+  const run = parts.slice(0, 2).join('/'), tab = parts.slice(2).join('/') || 'overview';
+  openRun(run, tab);
+}
+window.addEventListener('hashchange', route);
+loadRuns().then(() => { if (!location.hash && state.runs.length) location.hash = '#' + state.runs[0].name + '/scores'; else route(); }).catch(e => $('#runs').innerHTML = `<div class="empty err">${esc(e.message)}</div>`);
+if (!snapshot) setInterval(() => loadRuns().catch(() => {}), 30000);
+</script>
+</body>
+</html>
