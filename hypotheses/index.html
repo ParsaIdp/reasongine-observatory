@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="APOE4/APOE3 mechanistic hypotheses, held-out lipid prediction scores, and explicit baselines from Reasongine.">
+<title>Hypotheses | Reasongine Observatory</title>
+<style>
+:root{--ink:#202827;--muted:#68736f;--line:#dce3df;--wash:#f3f6f4;--green:#176b54;--soft:#e7f2ec;--amber:#8c5e17}
+*{box-sizing:border-box;letter-spacing:0}
+body{margin:0;color:var(--ink);background:#fff;font:14px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}a{color:var(--green)}button{cursor:pointer}button,a,input,select{touch-action:manipulation}
+:focus-visible{outline:3px solid #70b898;outline-offset:3px}
+header{padding:16px 28px;background:#202b27;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{font-size:18px;font-weight:650;color:#fff;text-decoration:none}header nav{display:flex;gap:22px;flex-wrap:wrap}header nav a{font-size:12px;color:#d5e7de;text-decoration:none}
+main{max-width:1500px;margin:auto;padding:22px 28px 32px}
+.title-line{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}h1{font-size:25px;line-height:1.3;margin:0;font-weight:650}.context{color:var(--muted);font-size:12px;margin:5px 0 0}
+.date{font-size:12px;color:var(--muted)}.stats{display:flex;gap:42px;flex-wrap:wrap;padding:19px 0 16px;border-bottom:1px solid var(--line)}.stats small{display:block;color:var(--muted);font-size:11px}.stats strong{font:600 21px/1.5 ui-monospace,monospace}
+.notice{margin:12px 0 18px;color:var(--muted);font-size:12px;max-width:112ch}.notice strong{color:var(--amber);font-weight:550}
+.workspace{display:grid;grid-template-columns:330px minmax(0,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+aside{border-right:1px solid var(--line);min-width:0;padding-top:16px}.filters{display:grid;gap:10px;padding:0 16px 16px}label{font-size:11px;color:var(--muted)}select,input{width:100%;border:1px solid var(--line);border-radius:4px;padding:8px 10px;color:var(--ink);background:white}.filter-pair{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:10px}.count{font-size:11px;color:var(--muted)}
+.hyp-list{height:550px;overflow:auto;border-top:1px solid var(--line)}.hyp-row{display:grid;grid-template-columns:26px minmax(0,1fr) 57px;gap:9px;width:100%;min-height:91px;text-align:left;background:white;border:0;border-bottom:1px solid #e9eeeb;padding:13px 15px;color:inherit}.hyp-row:hover{background:var(--wash)}.hyp-row[aria-pressed="true"]{background:var(--soft);box-shadow:inset 3px 0 var(--green)}.rank{font:11px/1.9 ui-monospace,monospace;color:var(--muted)}.row-title{font-size:12px;font-weight:550;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.row-meta{font-size:10px;line-height:1.5;color:var(--muted);margin-top:5px}.row-score{font:600 12px/1.5 ui-monospace,monospace;color:var(--green);text-align:right}
+.detail{padding:21px 28px 25px;min-width:0}.detail-top{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap}.meta{font-size:11px;color:var(--muted)}.permalink{font-size:11px;white-space:nowrap}.detail h2{font-size:20px;line-height:1.45;margin:9px 0 16px;font-weight:650;overflow-wrap:anywhere}.reading{max-height:565px;overflow:auto;padding-right:10px;overflow-wrap:anywhere}.claim{font-size:14px;line-height:1.8;margin:0 0 21px;max-width:90ch}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:13px 0}.metric small{display:block;font-size:10px;color:var(--muted)}.metric b{font:600 17px/1.6 ui-monospace,monospace}.comparison{margin:9px 0 19px;font-size:11px;color:var(--muted)}h3{font-size:13px;font-weight:650;margin:20px 0 9px}.mechanism{padding-left:21px;margin:8px 0}.mechanism li{padding:0 0 12px 4px;line-height:1.7;font-size:13px}.fold{border-top:1px solid var(--line);padding:12px 0}.fold summary{cursor:pointer;font-size:13px;font-weight:550}.fold li{margin-bottom:8px;font-size:13px}.empty{padding:40px 15px;text-align:center;color:var(--muted)}.back{display:none}
+.comparison-section{padding-top:22px}.comparison-section>summary{cursor:pointer;font-size:15px;font-weight:600}.chart{display:block;width:100%;max-width:1050px;height:auto;margin:12px auto 0;aspect-ratio:2048/1119;object-fit:contain}.chart-caption{color:var(--muted);font-size:12px;max-width:1050px;margin:7px auto 18px}.cohort-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:14px}.cohort-table th,.cohort-table td{padding:10px 14px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}.cohort-table th:first-child,.cohort-table td:first-child{text-align:left}.cohort-table th{font-weight:550;color:var(--muted)}
+footer{margin-top:25px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:11px}.error{padding:30px;color:#a4483b}
+@media(max-width:800px){header{padding:14px 16px}.brand{font-size:16px}header nav{gap:13px}main{padding:18px 15px 28px}.stats{gap:23px}.stats strong{font-size:18px}.workspace{grid-template-columns:280px minmax(0,1fr)}.detail{padding:18px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.detail h2{font-size:18px}}
+@media(max-width:620px){h1{font-size:22px}header{align-items:flex-start}.brand{max-width:155px}header nav{justify-content:flex-end;gap:8px 12px;max-width:150px}.workspace{display:block}.workspace.detail-open aside{display:none}.workspace:not(.detail-open) .detail{display:none}aside{border-right:0}.hyp-list{height:500px}.reading{max-height:none;padding-right:0}.detail{padding:17px 0}.back{display:block;background:none;border:0;padding:0 0 15px;color:var(--green);font-size:12px}.stats{justify-content:space-between;gap:12px}.stats small{font-size:10px}.stats strong{font-size:17px}.cohort-table th,.cohort-table td{padding:9px 5px;font-size:11px}.chart-caption{font-size:11px}.notice{font-size:11px}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="../">Reasongine Observatory</a><nav aria-label="Pages"><a href="../">Runs &amp; traces</a><a href="./" aria-current="page">Hypotheses</a><a href="https://github.com/ParsaIdp/reasongine-observatory" target="_blank" rel="noopener">GitHub</a></nav></header>
+<main>
+<div class="title-line"><div><h1>APOE4 / APOE3 hypotheses</h1><p class="context">Mock microglia &middot; RNA + protein discovery &middot; 618 held-out lipids</p></div><span class="date" id="date"></span></div>
+<div class="stats" id="stats"></div>
+<p class="notice"><strong id="baseline-notice"></strong> Scores rank hypothesis-predictor pairs, not causal validity. This lipid panel has been repeatedly inspected; these are exploratory results, not independent validation.</p>
+<div class="workspace" id="workspace">
+<aside><div class="filters"><label for="cohort">Model and generator prompt<select id="cohort"><option value="all">All cohorts</option></select></label><label for="search">Search hypotheses<input id="search" type="search" placeholder="Title, mechanism, gene..."></label><div class="filter-pair"><span class="count" id="count" aria-live="polite"></span><select id="sort" aria-label="Sort hypotheses"><option value="cosine_similarity">Lipid cosine</option><option value="centered_cosine_similarity">Centered cosine</option><option value="direction_accuracy">Direction</option><option value="mean_absolute_error">Lowest MAE</option></select></div></div><div class="hyp-list" id="hyp-list"></div></aside>
+<section class="detail" id="detail"><button class="back" id="back">Back to hypotheses</button><div class="detail-top"><span class="meta" id="meta"></span><a class="permalink" id="permalink">Link to this hypothesis</a></div><h2 id="title"></h2><div class="reading" id="reading"></div></section>
+</div>
+<details class="comparison-section" id="comparison"><summary>Scaling comparison and cohort results</summary><img class="chart" src="scaling.png" alt="Mean best held-out lipid cosine versus generator and predictor agent sessions for Opus, Astra and Sonnet, with original and evidence-v2 prompts."><p class="chart-caption">Uniform random subsets of each observed pool; dots show the mean of the best cosine. One hypothesis uses two agent sessions. Endpoints are full-pool maxima, not evidence of certainty. Predictors and harnesses differ between models. Sonnet means and curves retain legacy zero scores for zero-norm vectors; those cosines are mathematically undefined.</p><table class="cohort-table"><thead><tr><th scope="col">Cohort</th><th scope="col">Hypotheses</th><th scope="col">Mean cosine</th><th scope="col">Best cosine</th></tr></thead><tbody id="cohort-table"></tbody></table></details>
+<footer><span>Fixed public snapshot. Ongoing batches are not included.</span><span>Raw input files, prediction vectors, credentials, and model reasoning are excluded. Hypothesis prose may describe observations.</span></footer>
+</main>
+<noscript><p class="error">JavaScript is required to display the hypothesis snapshot.</p></noscript>
+<script src="hypotheses.js"></script>
+<script>
+'use strict';
+const data=window.HYPOTHESES;
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>Number.isFinite(v)?v.toFixed(4):'Not defined';
+const pct=v=>Number.isFinite(v)?(100*v).toFixed(1)+'%':'Not available';
+const names=Object.fromEntries(data.cohorts.map(c=>[c.id,c.label]));
+let selected=data.hypotheses[0]?.id;
+function scoreValue(item,field){
+ if(field==='cosine_similarity'&&!item.cosine_defined)return -Infinity;
+ if(field==='centered_cosine_similarity'&&!item.centered_cosine_defined)return -Infinity;
+ return item.score[field];
+}
+function displayScore(item){const field=$('#sort').value,value=scoreValue(item,field);return Number.isFinite(value)?(field==='direction_accuracy'?pct(value):num(value)):'n/a';}
+function visible(){
+ const query=$('#search').value.toLowerCase(),cohort=$('#cohort').value,field=$('#sort').value;
+ return data.hypotheses.filter(item=>(cohort==='all'||item.cohort===cohort)&&[item.hypothesis.title,item.hypothesis.claim,...item.hypothesis.mechanism_steps].join(' ').toLowerCase().includes(query)).sort((a,b)=>field==='mean_absolute_error'?a.score[field]-b.score[field]:scoreValue(b,field)-scoreValue(a,field));
+}
+function list(){
+ const items=visible();$('#count').textContent=items.length+' hypotheses';
+ if(items.length&&!items.some(item=>item.id===selected))selected=items[0].id;
+ $('#hyp-list').innerHTML=items.length?items.map((item,i)=>`<button class="hyp-row" data-id="${esc(item.id)}" aria-pressed="${item.id===selected}"><span class="rank">${i+1}</span><div><div class="row-title">${esc(item.hypothesis.title)}</div><div class="row-meta">${esc(names[item.cohort])} &middot; ${esc(item.hypothesis.hypothesis_id)}</div></div><span class="row-score">${displayScore(item)}</span></button>`).join(''):'<div class="empty">No matching hypotheses.</div>';
+ document.querySelectorAll('.hyp-row').forEach(button=>button.onclick=()=>{selected=button.dataset.id;$('#workspace').classList.add('detail-open');history.replaceState(null,'','#'+selected);list();detail();if(matchMedia('(max-width:620px)').matches)$('#workspace').scrollIntoView({block:'start'});});
+ if(!items.length){$('#title').textContent='No matching hypotheses';$('#reading').innerHTML='';$('#meta').textContent='';$('#permalink').hidden=true;}else detail();
+}
+function bullets(values,ordered=false){const tag=ordered?'ol':'ul';return `<${tag} class="mechanism">${(values||[]).map(v=>`<li>${esc(v)}</li>`).join('')}</${tag}>`;}
+function detail(){
+ const item=data.hypotheses.find(h=>h.id===selected);if(!item)return;
+ const h=item.hypothesis,s=item.score,b=data.baseline,delta=s.cosine_similarity-b.cosine_similarity;
+ $('#title').textContent=h.title;$('#meta').textContent=names[item.cohort]+' / batch '+item.batch+' / '+h.hypothesis_id+' / cohort rank '+item.cohort_rank;
+ $('#permalink').hidden=false;$('#permalink').href='#'+item.id;$('#permalink').onclick=()=>history.replaceState(null,'','#'+item.id);
+ $('#reading').innerHTML=`<p class="claim">${esc(h.claim)}</p><div class="metrics"><div class="metric"><small>Lipid cosine</small><b>${item.cosine_defined?num(s.cosine_similarity):'Not defined'}</b></div><div class="metric"><small>Centered cosine</small><b>${item.centered_cosine_defined?num(s.centered_cosine_similarity):'Not defined'}</b></div><div class="metric"><small>Direction accuracy</small><b>${pct(s.direction_accuracy)}</b></div><div class="metric"><small>Mean absolute error</small><b>${num(s.mean_absolute_error)}</b></div></div><p class="comparison">All-positive baseline: cosine ${num(b.cosine_similarity)}, direction ${pct(b.direction_accuracy)}.${item.cosine_defined?' Cosine difference '+(delta>=0?'+':'')+num(delta)+'.':''}${Number.isFinite(item.cost_usd)?' Recorded pair cost $'+item.cost_usd.toFixed(2)+'.':''}${!item.cosine_defined?' Legacy plots stored this undefined cosine as zero.':''}</p><h3>Proposed mechanism</h3>${bullets(h.mechanism_steps,true)}<details class="fold" open><summary>Falsifiable predictions</summary>${bullets(h.falsifiable_predictions)}</details><details class="fold"><summary>Assumptions</summary>${bullets(h.assumptions)}</details>`;
+ $('#reading').scrollTop=0;
+}
+const best=data.hypotheses[0].score.cosine_similarity;
+$('#stats').innerHTML=[['Published hypotheses',data.hypotheses.length],['Best lipid cosine',num(best)],['All-positive baseline',num(data.baseline.cosine_similarity)]].map(([name,value])=>`<div><small>${name}</small><strong>${value}</strong></div>`).join('');
+$('#baseline-notice').textContent=best>data.baseline.cosine_similarity?'Some candidates exceed the all-positive cosine baseline.':'No published hypothesis-predictor pair beats the all-positive cosine baseline.';
+$('#date').textContent='Snapshot '+new Date(data.published_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',timeZone:'UTC'});
+data.cohorts.forEach(c=>{const option=document.createElement('option');option.value=c.id;option.textContent=c.label+' ('+c.count+')';$('#cohort').append(option);});
+$('#cohort-table').innerHTML=data.cohorts.map(c=>`<tr><th scope="row">${esc(c.label)}</th><td>${c.count}</td><td>${num(c.mean)}</td><td>${num(c.best)}</td></tr>`).join('');
+function fromHash(){const id=location.hash.slice(1);if(data.hypotheses.some(h=>h.id===id)){selected=id;$('#cohort').value='all';$('#search').value='';$('#workspace').classList.add('detail-open');list();}}
+$('#cohort').onchange=()=>{selected=null;list();};$('#search').oninput=list;$('#sort').onchange=list;$('#back').onclick=()=>{$('#workspace').classList.remove('detail-open');history.replaceState(null,'',location.pathname+location.search);};window.addEventListener('hashchange',fromHash);
+list();fromHash();
+</script>
+</body>
+</html>
