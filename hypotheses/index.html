@@ -31,7 +31,7 @@ footer{margin-top:25px;display:flex;justify-content:space-between;gap:18px;flex-
 <body>
 <header><a class="brand" href="../">Reasongine Observatory</a><nav aria-label="Pages"><a href="../">Runs &amp; traces</a><a href="./" aria-current="page">Hypotheses</a><a href="https://github.com/ParsaIdp/reasongine-observatory" target="_blank" rel="noopener">GitHub</a></nav></header>
 <main>
-<div class="title-line"><div><h1>APOE4 / APOE3 hypotheses</h1><p class="context">Mock microglia &middot; RNA + protein discovery &middot; 618 held-out lipids</p></div><span class="date" id="date"></span></div>
+<div class="title-line"><div><h1 id="page-title">APOE4 / APOE3 hypotheses</h1><p class="context">Mock microglia &middot; RNA + protein discovery &middot; 618 held-out lipids</p><p class="context" id="selection-context"></p></div><span class="date" id="date"></span></div>
 <div class="stats" id="stats"></div>
 <p class="notice"><strong id="baseline-notice"></strong> Scores rank hypothesis-predictor pairs, not causal validity. This lipid panel has been repeatedly inspected; these are exploratory results, not independent validation.</p>
 <div class="workspace" id="workspace">
@@ -65,7 +65,7 @@ function visible(){
 function list(){
  const items=visible();$('#count').textContent=items.length+' hypotheses';
  if(items.length&&!items.some(item=>item.id===selected))selected=items[0].id;
- $('#hyp-list').innerHTML=items.length?items.map((item,i)=>`<button class="hyp-row" data-id="${esc(item.id)}" aria-pressed="${item.id===selected}"><span class="rank">${i+1}</span><div><div class="row-title">${esc(item.hypothesis.title)}</div><div class="row-meta">${esc(names[item.cohort])} &middot; ${esc(item.hypothesis.hypothesis_id)}</div></div><span class="row-score">${displayScore(item)}</span></button>`).join(''):'<div class="empty">No matching hypotheses.</div>';
+ $('#hyp-list').innerHTML=items.length?items.map((item,i)=>`<button class="hyp-row" data-id="${esc(item.id)}" aria-pressed="${item.id===selected}"><span class="rank">${data.selection?.top_n?item.global_rank:i+1}</span><div><div class="row-title">${esc(item.hypothesis.title)}</div><div class="row-meta">${esc(names[item.cohort])} &middot; ${esc(item.hypothesis.hypothesis_id)}</div></div><span class="row-score">${displayScore(item)}</span></button>`).join(''):'<div class="empty">No matching hypotheses.</div>';
  document.querySelectorAll('.hyp-row').forEach(button=>button.onclick=()=>{selected=button.dataset.id;$('#workspace').classList.add('detail-open');history.replaceState(null,'','#'+selected);list();detail();if(matchMedia('(max-width:620px)').matches)$('#workspace').scrollIntoView({block:'start'});});
  if(!items.length){$('#title').textContent='No matching hypotheses';$('#reading').innerHTML='';$('#meta').textContent='';$('#permalink').hidden=true;}else detail();
 }
@@ -73,16 +73,23 @@ function bullets(values,ordered=false){const tag=ordered?'ol':'ul';return `<${ta
 function detail(){
  const item=data.hypotheses.find(h=>h.id===selected);if(!item)return;
  const h=item.hypothesis,s=item.score,b=data.baseline,delta=s.cosine_similarity-b.cosine_similarity;
- $('#title').textContent=h.title;$('#meta').textContent=names[item.cohort]+' / batch '+item.batch+' / '+h.hypothesis_id+' / cohort rank '+item.cohort_rank;
+ $('#title').textContent=h.title;$('#meta').textContent=(data.selection?.top_n?'Rank '+item.global_rank+' / ':'')+names[item.cohort]+' / batch '+item.batch+' / '+h.hypothesis_id+' / cohort rank '+item.cohort_rank;
  $('#permalink').hidden=false;$('#permalink').href='#'+item.id;$('#permalink').onclick=()=>history.replaceState(null,'','#'+item.id);
  $('#reading').innerHTML=`<p class="claim">${esc(h.claim)}</p><div class="metrics"><div class="metric"><small>Lipid cosine</small><b>${item.cosine_defined?num(s.cosine_similarity):'Not defined'}</b></div><div class="metric"><small>Centered cosine</small><b>${item.centered_cosine_defined?num(s.centered_cosine_similarity):'Not defined'}</b></div><div class="metric"><small>Direction accuracy</small><b>${pct(s.direction_accuracy)}</b></div><div class="metric"><small>Mean absolute error</small><b>${num(s.mean_absolute_error)}</b></div></div><p class="comparison">All-positive baseline: cosine ${num(b.cosine_similarity)}, direction ${pct(b.direction_accuracy)}.${item.cosine_defined?' Cosine difference '+(delta>=0?'+':'')+num(delta)+'.':''}${Number.isFinite(item.cost_usd)?' Recorded pair cost $'+item.cost_usd.toFixed(2)+'.':''}${!item.cosine_defined?' Legacy plots stored this undefined cosine as zero.':''}</p><h3>Proposed mechanism</h3>${bullets(h.mechanism_steps,true)}<details class="fold" open><summary>Falsifiable predictions</summary>${bullets(h.falsifiable_predictions)}</details><details class="fold"><summary>Assumptions</summary>${bullets(h.assumptions)}</details>`;
  $('#reading').scrollTop=0;
 }
 const best=data.hypotheses[0].score.cosine_similarity;
+if(data.selection?.top_n){
+ const title='Top '+data.selection.top_n+' APOE hypotheses';
+ $('#page-title').textContent=title;document.title=title+' | Reasongine Observatory';
+ $('#selection-context').textContent='Highest lipid cosine among '+data.selection.evaluated_count.toLocaleString('en-US')+' scored pairs across all six model/prompt cohorts.';
+ $('#sort').hidden=true;
+ $('#comparison>summary').textContent='Scaling comparison and full candidate pool';
+}
 $('#stats').innerHTML=[['Published hypotheses',data.hypotheses.length],['Best lipid cosine',num(best)],['All-positive baseline',num(data.baseline.cosine_similarity)]].map(([name,value])=>`<div><small>${name}</small><strong>${value}</strong></div>`).join('');
 $('#baseline-notice').textContent=best>data.baseline.cosine_similarity?'Some candidates exceed the all-positive cosine baseline.':'No published hypothesis-predictor pair beats the all-positive cosine baseline.';
 $('#date').textContent='Snapshot '+new Date(data.published_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',timeZone:'UTC'});
-data.cohorts.forEach(c=>{const option=document.createElement('option');option.value=c.id;option.textContent=c.label+' ('+c.count+')';$('#cohort').append(option);});
+data.cohorts.filter(c=>(c.selected_count??c.count)>0).forEach(c=>{const option=document.createElement('option');option.value=c.id;option.textContent=c.label+' ('+(c.selected_count??c.count)+')';$('#cohort').append(option);});
 $('#cohort-table').innerHTML=data.cohorts.map(c=>`<tr><th scope="row">${esc(c.label)}</th><td>${c.count}</td><td>${num(c.mean)}</td><td>${num(c.best)}</td></tr>`).join('');
 function fromHash(){const id=location.hash.slice(1);if(data.hypotheses.some(h=>h.id===id)){selected=id;$('#cohort').value='all';$('#search').value='';$('#workspace').classList.add('detail-open');list();}}
 $('#cohort').onchange=()=>{selected=null;list();};$('#search').oninput=list;$('#sort').onchange=list;$('#back').onclick=()=>{$('#workspace').classList.remove('detail-open');history.replaceState(null,'',location.pathname+location.search);};window.addEventListener('hashchange',fromHash);
