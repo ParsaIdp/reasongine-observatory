@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Reproducible construction of predictions.json for hyp_165.
+
+Zero prior; every nonzero effect is tied to an explicit hypothesis step.
+Only values from prediction_policy.json are emitted.
+"""
+import json, re
+from pathlib import Path
+
+schema = json.loads(Path("evaluation_schema.json").read_text())
+policy = json.loads(Path("prediction_policy.json").read_text())
+hyp = json.loads(Path("hypothesis.json").read_text())
+allowed = set(policy["allowed_effects"])
+
+def cls(desc):
+    """Leading class token, before '(', '_' or ' '. Reproducible selector."""
+    return re.split(r"[\(_ ]", desc.strip())[0]
+
+# class token -> (effect, hypothesis step)
+RULES = {
+    # step 3/4/6: sterol routed to ester pool; SOAT1 up; explicit CE prediction
+    "CE":            (1.0,  "step3+step6: SOAT1-mediated esterification of delivered+synthesised sterol; CE named"),
+    "DE":            (0.5,  "step3+step4: sterol-ester route applies to desmosteryl ester; DHCR24 up opposes precursor"),
+    # step 3/6: DGAT1/AGPAT2/ABHD5 up; explicit TG prediction
+    "TG":            (1.0,  "step3+step6: DGAT1/AGPAT2 storage routing; TG named"),
+    "DG":            (0.25, "step3: AGPAT2->PA->DG supply for expanded TG pool; DGAT1 consumption opposes"),
+    # step 2/6: lysosomal glyco/sphingolipid substrate accumulation, named species
+    "HexCer":        (1.0,  "step2+step6: hexosylceramide named as accumulating lysosomal substrate"),
+    "GM3":           (1.0,  "step2+step6: GM3-type named as accumulating lysosomal substrate"),
+    "Hex2Cer":       (0.5,  "step6: class-wide glycosphingolipid substrate statement, species not named"),
+    "Hex3Cer":       (0.5,  "step6: class-wide glycosphingolipid substrate statement, species not named"),
+    "Sulfatide":     (0.25, "step6: glycosphingolipid substrate, but ARSA not in the elevated hydrolase set"),
+    # step 2: expanded late-endosome/lysosome compartment (TFEB, LAMP1, v-ATPase)
+    "BMP":           (0.5,  "step2: BMP scales with late-endosomal internal membrane of an expanded compartment"),
+    "HB":            (0.25, "step2: hemi-BMP acyl intermediate of the same compartment"),
+    # step 3: phospholipid synthesis/remodelling arm (AGPAT2, LPCAT1) + step4 FA supply
+    "PC":            (0.25, "step3: LPCAT1/AGPAT2 phospholipid arm + endomembrane expansion"),
+    "PE":            (0.25, "step3: AGPAT2 glycerophospholipid arm + endomembrane expansion"),
+    "PI":            (0.25, "step3: AGPAT2 PA->CDP-DAG->PI arm"),
+    "LPC":           (-0.25,"step3: LPCAT1 up consumes LPC in the Lands cycle"),
+    # step 4: mevalonate/SREBP2 program stays on
+    "Ubiquinone":    (0.25, "step4: isoprenoid branch of the un-repressed mevalonate program"),
+}
+# explicit abstentions (unresolved opposing signs) -> 0.0
+ABSTAIN = {
+    "COH":  "step3 vs step4: esterification lowers free sterol, uptake+synthesis raise it; ER relocation is not a whole-cell pool claim",
+    "SM":   "step2: SMPD1 capacity up (lowers SM) vs increased sphingolipid delivery (raises SM)",
+    "Cer":  "step2: GBA/SMPD1 generate Cer while HexCer synthesis and ceramidase consume it",
+    "dhCer":"step2/4: de novo sphingoid supply not a signed hypothesis step",
+    "Cer1P":"no hypothesis step names ceramide-1-phosphate",
+    "Sph":  "step2: degradative product vs substrate accumulation unresolved",
+    "S1P":  "no hypothesis step names sphingosine kinase / S1P export",
+    "PS":   "no PS synthase step in the hypothesis",
+    "PG":   "BMP precursor: increased BMP demand could raise flux or deplete pool",
+    "LPG":  "BMP precursor / LPCAT1 substrate: opposing signs",
+    "LPE":  "no named LPE acyltransferase; Lands-cycle sign not transferable from LPC",
+    "LPI":  "no named LPI acyltransferase step",
+    "AcylCarnitine": "step3 routes FA to storage but no CPT1/oxidation transcript is claimed",
+}
+
+preds, audit = [], []
+for feat in schema["features"]:
+    t = cls(feat["description"])
+    if t in RULES:
+        eff, why = RULES[t]
+    elif t in ABSTAIN:
+        eff, why = 0.0, "ABSTAIN: " + ABSTAIN[t]
+    else:
+        raise SystemExit(f"unclassified token {t!r} for {feat['feature_id']}")
+    assert eff in allowed, eff
+    preds.append({"feature_id": feat["feature_id"], "predicted_effect": eff})
+    audit.append((feat["feature_id"], t, eff, why))
+
+rationale = (
+    "Zero prior. Nonzero values only where a hypothesis step maps to a whole-cell lipid pool. "
+    "Step 3/6 (SOAT1/DGAT1 routing of delivered and SREBP-synthesised lipid into esters and droplets) "
+    "gives CE and TG +1.0, desmosteryl ester +0.5, DG +0.25. Step 2/6 (delivery exceeds an expanded but "
+    "not-failing lysosomal hydrolase program) gives the explicitly named HexCer and GM3 +1.0, the "
+    "unnamed Hex2/Hex3Cer +0.5 and sulfatide +0.25; step 2 compartment expansion (TFEB/LAMP1/v-ATPase) "
+    "gives BMP +0.5 and hemi-BMP +0.25. Step 3's LPCAT1/AGPAT2 phospholipid arm gives PC/PE/PI +0.25 and "
+    "LPC -0.25 (Lands-cycle consumption). Step 4's un-repressed mevalonate program gives ubiquinone +0.25. "
+    "Free cholesterol (COH) is abstained: the claim is a lower FC:CE ratio and a lower ER-accessible pool, "
+    "which is compartmental and does not sign the whole-cell sterol pool against increased uptake plus "
+    "synthesis. SM, Cer, dhCer, Sph, S1P, Cer1P, PS, PG/LPG, LPE, LPI and acylcarnitines are abstained for "
+    "unresolved opposing signs or absent steps. Transcript levels are treated as capacity, not flux; all "
+    "nonzero calls assume the steady-state pool scales with the routed flux. Tiers are heuristic, not "
+    "probabilities."
+)
+Path("predictions.json").write_text(json.dumps(
+    {"hypothesis_id": hyp["hypothesis_id"], "vector_rationale": rationale, "predictions": preds},
+    indent=2) + "\n")
+
+from collections import Counter
+c = Counter(e for _, _, e, _ in audit)
+print("tier counts:", dict(sorted(c.items())))
+print("pos", sum(v for k, v in c.items() if k > 0 for _ in [0]) and sum(c[k] for k in c if k > 0),
+      "neg", sum(c[k] for k in c if k < 0), "zero", c[0.0], "total", len(preds))
+by = Counter((t, e) for _, t, e, _ in audit)
+for (t, e), n in sorted(by.items()): print(f"  {t:14s} {e:+.2f}  n={n}")
